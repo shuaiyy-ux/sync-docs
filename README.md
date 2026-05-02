@@ -15,7 +15,7 @@ claude-knowledge/
 
 ## How it works
 
-**Multi-root scanning** — By default scans `~/Downloads`, `~/dev`, `~/Documents`, `~/projects`, `~/code` (skipping any that don't exist). Pass paths as arguments to override. Scanning multiple roots at once is what makes content-based move detection work — when you `mv` a project from `~/Downloads/foo` to `~/dev/active/foo`, the skill sees both ends and updates the path instead of treating it as delete+new.
+**Multi-root scanning** — By default scans `~/Downloads`, `~/Documents`, `~/projects`, `~/code` (skipping any that don't exist). Pass paths as arguments to override. Scanning multiple roots at once is what makes content-based move detection work — when you `mv` a project from `~/Downloads/foo` to `~/projects/foo`, the skill sees both ends and updates the path instead of treating it as delete+new.
 
 **Content-based identity** — A file's identity is its MD5 hash, not its path. The move detection algorithm:
 
@@ -69,6 +69,6 @@ Then run `/sync-docs` in any Claude Code session.
 
 Your engineering lessons, architecture decisions, product specs, and deployment guides are scattered across dozens of repos and folders. Every new Claude Code conversation only sees the current project — everything else is a blind spot.
 
-sync-docs turns all of that into a structured, searchable knowledge base that fits in the AI context window. Move a project from `Downloads` to `dev/archive` six months later — the index updates the path automatically and your accumulated knowledge stays put. No re-indexing, no lost takeaways.
+sync-docs turns all of that into a structured, searchable knowledge base that fits in the AI context window. Move a project from `Downloads` to `Downloads/archive` six months later — the index updates the path automatically and your accumulated knowledge stays put. No re-indexing, no lost takeaways.
 
 **An O(changed) incremental document indexer that treats content hash as identity, outputting directly into AI context. Reorganize your filesystem freely; your knowledge base follows.**

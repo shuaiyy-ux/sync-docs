@@ -8,7 +8,6 @@ You are maintaining a centralized knowledge base of all Markdown documentation a
 
 ```
 /Users/cm/Downloads
-/Users/cm/dev
 /Users/cm/Documents
 /Users/cm/projects
 /Users/cm/code
