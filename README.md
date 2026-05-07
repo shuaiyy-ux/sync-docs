@@ -55,6 +55,33 @@ The secondary pass substring-matches the cached takeaway against keyword sets (`
 
 **context.md design** — Section ordering puts Project Profiles and Personal Knowledge first (the most-referenced material when priming a new session), followed by reference categories. Hard limit of 2000 lines with priority-based truncation: drops Other → truncates lengthy Engineering Lessons / Architecture entries → never touches Project Profiles or Personal Knowledge.
 
+**Kind classification** — Lesson-like files are tagged `evergreen` (mechanism-level pitfall reusable across projects, e.g. "DispatchQueue.main.asyncAfter breaks SwiftUI animation timing") or `project-specific` (project-internal decisions like "we use Pow for animations"). `project-specific` entries stay in `registry.md` for searchability but are excluded from `context.md` to keep the cross-project view clean.
+
+**Staleness markers** — Entries whose source file hasn't been modified in >180 days are rendered in `context.md` with an `[unverified — last seen YYYY-MM-DD]` prefix. This drives the "verify before applying" protocol: KB is hypothesis, code is truth.
+
+**By Task Trigger view** — `registry.md` includes a second index grouping files by likely task triggers (UI / API contract / Bug 排查 / DB migration / Deploy-CI / platform-specific). Built from cheap takeaway-keyword matching. Designed to be copy-pasted into project CLAUDE.md "scenario trigger" blocks.
+
+**CLAUDE.md punch list** — At the end of each sync, the skill audits every project's `CLAUDE.md` for KB integration: validates referenced KB paths against current state, flags moved/deleted references, and emits suggested pointer snippets for projects that have no KB integration. Never auto-edits — produces a manual review list.
+
+**Diff since last sync** — Highlights what's new (evergreen lessons that just landed in KB), what was substantively updated, what just turned stale, and what just moved. Closes the awareness gap so you don't have to re-read the full `context.md` every week.
+
+**Prune mode** — `/sync-docs --prune` runs an interactive cleanup pass: Wave 1 surfaces stale (>180 days), empty (<200 chars), or scratch-named files for confirmation; Wave 2 audits everything in the `Other` category for recategorize / index-only / delete / keep. Every deletion requires explicit per-file y/n. Decisions are logged to `claude-knowledge/logs/prune-decisions-YYYYMMDD.md`.
+
+## Measuring KB usefulness
+
+`measure-kb-usage.py` mines existing JSONL session logs (`~/.claude/projects/-Users-cm-Downloads-*/`) for every event where Claude touched the KB, captures trigger context + query + result + downstream actions, and runs an LLM judge to classify each event as `applied` / `consulted_no_action` / `contradicted` / `unrelated_match` / `unknown`.
+
+Output: `~/Downloads/claude-knowledge/logs/kb-usage-report.md` with per-project engagement, application rate, top KB paths referenced, and concrete examples of "applied" vs "stale" events.
+
+```bash
+python3 measure-kb-usage.py                    # full run with judge (~$1-2 in tokens)
+python3 measure-kb-usage.py --no-judge         # heuristics only, no LLM cost
+python3 measure-kb-usage.py --since 2026-04-01 # date filter
+python3 measure-kb-usage.py --project EmailDigest
+```
+
+This is how you answer "is the KB actually being used?" with data instead of intuition.
+
 ## Installation
 
 Copy `sync-docs.md` to your Claude Code commands directory:
@@ -63,7 +90,9 @@ Copy `sync-docs.md` to your Claude Code commands directory:
 cp sync-docs.md ~/.claude/commands/sync-docs.md
 ```
 
-Then run `/sync-docs` in any Claude Code session.
+Then run `/sync-docs` in any Claude Code session. After editing `sync-docs.md` in this repo, re-run the `cp` — Claude Code reads the installed copy, not the source.
+
+`measure-kb-usage.py` is a standalone Python script (stdlib only); run it directly with `python3`.
 
 ## Why
 

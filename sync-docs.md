@@ -1,10 +1,23 @@
 ---
-description: "Scan all projects for MD documentation, build a centralized knowledge base with dedup and categorization"
+name: sync-docs
+description: |
+  Refresh the cross-project Markdown knowledge base at ~/Downloads/claude-knowledge/.
+  Invoke when: user explicitly says "sync docs" / "rebuild KB" / "rescan projects" /
+  "更新知识库"; OR after a substantial doc/lessons writeup in any project that should
+  propagate to the central index; OR when context.md is over 7 days stale and a
+  cross-project task is starting. DO NOT invoke for single-project doc edits — this
+  rebuilds the full index every call and is not free.
 ---
 
 You are maintaining a centralized knowledge base of all Markdown documentation across the user's projects. Follow these steps precisely.
 
-**Scan roots**: If $ARGUMENTS is provided, treat each space-separated path as a scan root. Otherwise default to the full set:
+**Modes**: parse `$ARGUMENTS` for flags before treating tokens as scan roots:
+
+- `--prune` — after the regular sync, run an interactive cleanup pass (Wave 1: stale/empty/scratch files; Wave 2: Other-category audit). Destructive deletions require explicit y/n per file.
+
+Strip recognised flags from `$ARGUMENTS`; remaining tokens are scan roots.
+
+**Scan roots**: If positional `$ARGUMENTS` are provided, treat each space-separated path as a scan root. Otherwise default to the full set:
 
 ```
 /Users/cm/Downloads
@@ -180,6 +193,20 @@ Only invoked if primary rules returned `Other`. Read the takeaway already produc
 
 The secondary pass exists because filenames lie. A file called `notes.md` could be lessons learned, a playbook, or a stub — only content tells. Keep this pass cheap: substring match on the cached takeaway, no extra LLM call.
 
+### Kind classification (for lesson-like categories)
+
+After category is fixed, for files in `Engineering Lessons` or `Personal Knowledge`, also assign a `kind`:
+
+| Kind | Heuristic (any match in takeaway) |
+|---|---|
+| `evergreen` | Names a framework / language / API behavior / mechanism-level pitfall (e.g. "DispatchQueue.main.asyncAfter", "VNClassifyImageRequest", "useEffect cleanup", "FastAPI dependency injection", "SwiftUI", "race condition", "memory leak") |
+| `project-specific` | Names project-internal choices: "we use", "我们用", "我们决定", project-name + "Pow"/"Lottie"/"Sentry"/specific library, schema names, internal endpoint names, internal table/model names |
+| `unknown` | None of above clear |
+
+Why this matters: `evergreen` lessons travel between projects (mechanism-level pitfalls recur). `project-specific` lessons pollute cross-project view — they only mean something in the original project. The kind drives Step 6 inclusion: `project-specific` entries stay in `registry.md` (still indexed) but are **excluded from `context.md`** to keep cross-project view clean.
+
+Rules-only — no extra LLM call. Misclassifications are cheap (file still indexed, just lives in a different bucket).
+
 ## Step 6: Build context.md
 
 For each **new, updated, or moved** file, read the first 2000 characters using `head -c 2000` in batches (more efficient than individual Read calls for many files). Extract:
@@ -187,6 +214,17 @@ For each **new, updated, or moved** file, read the first 2000 characters using `
 - A 2-5 line takeaway: the core lessons, decisions, or facts — more than a sentence, less than a paragraph
 
 For **unchanged** files, reuse their entry from `hashes.json` (the `title` and `takeaway` fields saved in Step 8).
+
+### Staleness markers
+
+Compare each file's `mtime` (from Step 2) and `last_verified_at` (from prior `hashes.json`, may be null) against now:
+
+- If `mtime` > 180 days ago AND (`last_verified_at` is null OR > 180 days ago) → prefix the rendered takeaway in `context.md` with `[unverified — last seen YYYY-MM-DD]` where the date is the more recent of mtime / last_verified_at.
+- This is a **rendering-time** decoration; the underlying takeaway stays clean. It's the visual cue that drives the "verify before applying" protocol in CLAUDE-TEMPLATE's KB usage section.
+
+### Project-specific exclusion
+
+Files with `kind: project-specific` (from Step 5) are **excluded from context.md** Engineering Lessons / Personal Knowledge sections. They remain in `registry.md` and `hashes.json` (still indexed by name + project for searchability via grep), they just don't pollute the cross-project narrative view.
 
 Write `/Users/cm/Downloads/claude-knowledge/context.md` with this structure. **Section order matters** — Project Profiles and Personal Knowledge come first because they're the most-referenced overview material:
 
@@ -277,6 +315,30 @@ Write `/Users/cm/Downloads/claude-knowledge/registry.md`:
 
 (repeat per category)
 
+## By Task Trigger
+
+(Indexed by takeaway-text keyword match. Files can appear in multiple buckets. This is the section users copy-paste into project CLAUDE.md "scenario trigger" blocks.)
+
+### UI / 设计系统
+| File | Project | Hash |
+|------|---------|------|
+| ... (files matching `ui-rules` / `design system` / `design tokens` / `颜色` / `排版` in takeaway) | ... | ... |
+
+### API contract / 前后端对接
+(files matching `api contract` / `endpoint` / `breaking change` / `request schema` / `契约`)
+
+### Bug 排查 / 经验教训
+(files matching `lesson` / `pitfall` / `bug` / `regression` / `postmortem` / `gotcha` / `踩坑`)
+
+### 数据迁移 / DB
+(files matching `migration` / `schema` / `database` / `sqlite` / `postgres` / `swiftdata`)
+
+### 启动 / 部署 / CI
+(files matching `deploy` / `dockerfile` / `start.sh` / `systemctl` / `github actions` / `ci`)
+
+### 平台特定
+(grouped by detected stack from path/takeaway: iOS / SwiftUI / React / FastAPI / Next.js / Bun / etc.)
+
 ## Duplicate Sets
 
 | Canonical | Aliases | Hash |
@@ -290,6 +352,8 @@ Write `/Users/cm/Downloads/claude-knowledge/registry.md`:
 | CLAUDE.md | clawapp, amigo_app, ... |
 ```
 
+The By Task Trigger pass uses cheap substring matching against the cached takeaway — no extra LLM call. A file qualifies for a bucket if its takeaway lowercased contains any of the bucket's trigger keywords. Skip empty buckets (don't render).
+
 ## Step 8: Write hashes.json
 
 Write `/Users/cm/Downloads/claude-knowledge/hashes.json`:
@@ -302,11 +366,14 @@ Write `/Users/cm/Downloads/claude-knowledge/hashes.json`:
     "/absolute/path/file.md": {
       "hash": "<md5>",
       "category": "<category>",
+      "kind": "evergreen | project-specific | unknown",
+      "last_verified_at": null,
       "canonical": true,
       "alias_of": null,
       "title": "The Document Title",
       "takeaway": "2-5 line summary for reuse on next sync",
-      "previous_paths": []
+      "previous_paths": [],
+      "mtime": 1714000000.0
     }
   }
 }
@@ -314,9 +381,15 @@ Write `/Users/cm/Downloads/claude-knowledge/hashes.json`:
 
 For alias files, set `"canonical": false` and `"alias_of": "/path/to/canonical.md"`. The `title` and `takeaway` fields allow unchanged files to skip re-reading on the next sync.
 
+`"kind"` is set in Step 5 by the lesson-kind classifier. Drives `context.md` inclusion (project-specific files indexed but not rendered cross-project) and the `[unverified]` decoration logic.
+
+`"last_verified_at"` is initialized to `null`. It is intended to be updated when a user/Claude explicitly confirms the lesson still holds against current code (mechanism out of scope for this skill — field reserved). Until then, staleness is judged on `mtime` alone.
+
+`"mtime"` is the file's last modification time (collected in Step 2). Used for staleness checks in Step 6 and Step 9.
+
 `"previous_paths"` records the file's location history when a move is detected — append the old path each time the entry's path changes. This makes move chains (`~/Downloads/foo` → `~/dev/active/foo` → `~/dev/archive/foo`) traceable. Cap at the last 5 entries to keep size bounded.
 
-**Backwards compatibility**: if Step 0 reads a `hashes.json` with the old `scan_root` (singular) field, treat it as `scan_roots: [scan_root]`. Files lacking `previous_paths` are treated as having `[]`. No migration script needed — the next write produces the new schema.
+**Backwards compatibility**: if Step 0 reads a `hashes.json` with the old `scan_root` (singular) field, treat it as `scan_roots: [scan_root]`. Files lacking `previous_paths` are treated as having `[]`. Files lacking `kind` / `last_verified_at` / `mtime` get re-classified on next read (kind from takeaway, last_verified_at = null, mtime from filesystem). No migration script needed — the next write produces the new schema.
 
 ## Step 9: Staleness Check
 
@@ -374,9 +447,145 @@ These files haven't been touched in over 3 months. Consider reviewing or removin
 
 If first run, skip "Changes since last sync" and say "First scan — all files are new."
 
+## Step 11: CLAUDE.md Punch List
+
+For every project directory that contains a top-level `CLAUDE.md`, audit how it integrates with the KB and emit suggestions. **Do NOT auto-edit project CLAUDE.md files** — only print the punch list.
+
+For each `<project>/CLAUDE.md`:
+
+1. Read the file (≤8000 chars is enough for any reasonable CLAUDE.md).
+2. Check if it contains the substring `claude-knowledge` OR references `context.md` / `registry.md`.
+3. If yes:
+   - Extract every path-like token starting with `~/Downloads/claude-knowledge/` or absolute equivalent.
+   - For each referenced KB path, check current `hashes.json`:
+     - Path exists → ✓
+     - Path is in some entry's `previous_paths` → ⚠ moved (report new canonical path)
+     - Path is gone entirely → ✗ deleted
+   - Check the framing: does it say "every 5 conversations" or similar boilerplate? → ⚠ recommend upgrading to scenario-trigger pattern from `CLAUDE-TEMPLATE.md`.
+4. If no:
+   - Look at the project's stack (best-effort heuristics: filenames in repo, `package.json` / `pyproject.toml` / `project.yml` if present).
+   - Cross-reference KB By Task Trigger buckets — does the KB have entries that would be relevant?
+   - Emit ✗ "no KB integration" + a minimal pointer snippet to paste in.
+
+Output format:
+
+```
+## CLAUDE.md Suggestions (manual review)
+
+EmailDigest/CLAUDE.md
+  ✓ References KB with scenario triggers — looks current
+
+vigil/CLAUDE.md
+  ⚠ Only references context.md once with "every 5 conversations" boilerplate
+  → suggested replacement: see CLAUDE-TEMPLATE.md "KB 使用协议" section
+
+capstone/CLAUDE.md
+  ✗ No KB reference at all — KB has N entries that match this project's stack
+  → minimal pointer snippet:
+    ## KB 使用协议
+    `~/Downloads/claude-knowledge/registry.md` 索引按任务场景查 — 触发场景见 CLAUDE-TEMPLATE.md
+```
+
+This closes the "build KB → use KB" loop. User decides whether to apply each suggestion.
+
+## Step 12: Diff Since Last Sync
+
+Print a concise summary of what changed in the KB this run, prioritizing high-signal additions:
+
+```
+## What's new since last sync
+
+### New evergreen lessons (cross-project value)
+- <project> — <title> | takeaway snippet (≤120 chars)
+- ...
+
+### Updated entries with substantive change
+(updated files where the takeaway delta is non-trivial — heuristic: takeaway length differs by >30 chars or first sentence changed)
+- <project> — <title>
+- ...
+
+### Newly stale (>180 days untouched, may need review)
+- <project>/<file> — last touched YYYY-MM-DD
+- ...
+
+### Just-moved files (path changed, content same)
+- <old> → <new>
+- ...
+```
+
+Heuristic for "substantive": takeaway-string Levenshtein-style change > 30 chars OR first sentence (up to first `.`/`。`) differs. Don't run actual Levenshtein — just `len(diff)` is fine.
+
+This is what gives the user "what to read this week" without re-reading the whole context.md.
+
+## Step 13: Prune Mode (only if `--prune` was passed)
+
+After all the above, if `--prune` is in `$ARGUMENTS`, run two interactive cleanup waves. **Always confirm per file before deletion.** Never delete silently.
+
+### Wave 1: Auto-flagged garbage
+
+Build the candidate list from `hashes.json` (post-sync state):
+
+| Trigger | Criterion |
+|---|---|
+| Stale | `mtime` > 180 days ago AND category ≠ `Project Profiles` |
+| Empty | Source file size < 200 chars |
+| Scratch | Filename matches `*tmp*` / `*scratch*` / `*draft*` / `*WIP*` / `*old*` / `*backup*` |
+| Dead-project alias | Non-canonical alias whose canonical project has no commits in 365 days (best-effort: check git log) |
+
+For each candidate, print:
+```
+[stale + scratch] /Users/cm/Downloads/foo/bar/old-notes.md
+  Title: ...
+  Takeaway: ...
+  Last touched: 2025-08-12 (267 days ago)
+  Action [d]elete / [k]eep / [s]kip-rest:
+```
+
+Read user input. `d` deletes the actual file (not just the index). `k` adds it to a "keep" list (suppresses on future prunes). `s` exits Wave 1 immediately.
+
+### Wave 2: Other-category audit
+
+For all `category: Other` entries (non-alias), prompt similarly:
+```
+[Other] /Users/cm/Downloads/foo/notes.md
+  Title: ...
+  Takeaway: ...
+  Action [r]ecategorize / [i]ndex-only / [d]elete / [k]eep / [s]kip-rest:
+```
+
+- `r` — prompt for new category (one-letter shortcut), update `hashes.json` and re-render context.md/registry.md at end
+- `i` — set a `index_only: true` flag in `hashes.json` (file stays in registry.md but skipped by context.md)
+- `d` — delete the file
+- `k` — leave as is
+
+### Audit log
+
+Write all decisions to `~/Downloads/claude-knowledge/logs/prune-decisions-YYYYMMDD.md`:
+
+```markdown
+# Prune Run YYYY-MM-DD HH:MM
+
+## Wave 1 — auto-flagged
+| File | Triggers | Action |
+| ... | stale, scratch | deleted |
+...
+
+## Wave 2 — Other audit
+| File | Action |
+| ... | recategorized → Engineering Lessons |
+...
+```
+
+### Re-render after prune
+
+If any deletes happened, re-run Steps 6 and 7 (rebuild `context.md` + `registry.md`) and rewrite `hashes.json` so the on-disk artifacts match the post-prune state.
+
 ## Verification
 
 After writing all files, verify:
 1. `wc -l` on context.md is under 2000
 2. `python3 -c "import json; json.load(open('/Users/cm/Downloads/claude-knowledge/hashes.json'))"` passes
 3. File count in hashes.json matches discovered files
+4. Every entry in `hashes.json` has the new fields (`kind`, `last_verified_at`, `mtime`) — older runs upgrade in place
+5. `context.md` does not contain any entry whose `kind == "project-specific"` (kept in registry.md only)
+6. If `--prune` ran with deletions: re-rendered `context.md` no longer references deleted paths
