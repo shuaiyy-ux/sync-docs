@@ -1,0 +1,16 @@
+#!/bin/bash
+# Fast kb-search launcher: skip the system-python → venv re-exec dance.
+# Falls back to invoking kb-search.py via system python if the venv isn't ready
+# (which then bootstraps it on first run).
+
+KB="${CLAUDE_KB_DIR:-$HOME/Downloads/claude-knowledge}"
+VENV_PY="$KB/.venv/bin/python"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT="$SCRIPT_DIR/kb-search.py"
+
+if [ -x "$VENV_PY" ]; then
+  exec "$VENV_PY" "$SCRIPT" "$@"
+fi
+
+# Fallback: let kb-search.py bootstrap the venv itself.
+exec python3 "$SCRIPT" "$@"
