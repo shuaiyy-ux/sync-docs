@@ -220,6 +220,10 @@ def main():
                     help="don't filter aliases / non-canonical cluster members")
     ap.add_argument("--include-self-referential", action="store_true",
                     help="don't penalize entries from the sync-docs skill itself")
+    ap.add_argument("--no-cache", action="store_true",
+                    help="do not read or write query_cache.json")
+    ap.add_argument("--read-only", action="store_true",
+                    help="alias for --no-cache; useful for validation smoke tests")
     ap.add_argument("--stack", default=None,
                     help="bias results toward this stack (e.g. 'swift,swiftui,swiftdata' or 'fastapi,sqlalchemy'). "
                          "Adds a small positive score boost to entries whose path or takeaway contains any stack token.")
@@ -265,7 +269,8 @@ def main():
     emb_mtime = int(EMB_PATH.stat().st_mtime)
     cache_key = f"{emb_mtime}::{MODEL_NAME}::{query}"
     qv = None
-    if QUERY_CACHE_PATH.exists():
+    use_cache = not (args.no_cache or args.read_only)
+    if use_cache and QUERY_CACHE_PATH.exists():
         try:
             cache = json.load(QUERY_CACHE_PATH.open())
             if cache_key in cache:
@@ -277,15 +282,16 @@ def main():
 
     if qv is None:
         qv = encode_query(query, np)
-        cache[cache_key] = qv.tolist()
-        # Cap cache to last 256 entries
-        if len(cache) > 256:
-            cache = dict(list(cache.items())[-256:])
-        # Atomic write
-        tmp = str(QUERY_CACHE_PATH) + ".tmp"
-        with open(tmp, "w") as fh:
-            json.dump(cache, fh)
-        os.rename(tmp, str(QUERY_CACHE_PATH))
+        if use_cache:
+            cache[cache_key] = qv.tolist()
+            # Cap cache to last 256 entries
+            if len(cache) > 256:
+                cache = dict(list(cache.items())[-256:])
+            # Atomic write
+            tmp = str(QUERY_CACHE_PATH) + ".tmp"
+            with open(tmp, "w") as fh:
+                json.dump(cache, fh)
+            os.rename(tmp, str(QUERY_CACHE_PATH))
 
     allowed_idx = np.where(allowed)[0]
     sub = arr[allowed_idx]
