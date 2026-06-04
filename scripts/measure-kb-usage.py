@@ -12,10 +12,10 @@ Output:
   ~/Downloads/claude-knowledge/logs/kb-usage-report.md — aggregate report
 
 Usage:
-  python3 measure-kb-usage.py
-  python3 measure-kb-usage.py --no-judge           # heuristic only, no LLM cost
-  python3 measure-kb-usage.py --since 2026-04-01   # date filter
-  python3 measure-kb-usage.py --project EmailDigest
+  python3 ~/Downloads/sync-docs/scripts/measure-kb-usage.py
+  python3 ~/Downloads/sync-docs/scripts/measure-kb-usage.py --no-judge
+  python3 ~/Downloads/sync-docs/scripts/measure-kb-usage.py --since 2026-04-01
+  python3 ~/Downloads/sync-docs/scripts/measure-kb-usage.py --project EmailDigest
 """
 
 import argparse

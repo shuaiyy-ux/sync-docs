@@ -2,9 +2,9 @@
 name: kb-integrate
 description: |
   Wire the current project's AGENTS.md into the cross-project knowledge base.
-  Reads @KB_HOME@/CLAUDE-TEMPLATE.md as the source of truth
-  for what good KB integration looks like, audits the current project's Codex instructions,
-  proposes a diff, and applies it after user approval. Never edits silently.
+  Uses Codex-native instructions as the primary target, reads legacy Claude template
+  material when needed for migration compatibility, proposes a diff, and applies it
+  after user approval. Never edits silently.
 
   Invoke when: starting a new project that should have KB access; or when an
   existing project's AGENTS.md or CLAUDE.md was written before the KB existed; or when the
@@ -16,7 +16,9 @@ description: |
   /kb-integrate makes a single project consume the KB.
 ---
 
-You are integrating the cross-project knowledge base into the current project's Codex instructions. You are running INSIDE that project's directory.
+You are integrating the cross-project knowledge base into the current project's assistant instructions. You are running INSIDE that project's directory.
+
+Codex is the primary runtime. `AGENTS.md` is the preferred target. `CLAUDE.md` and `@KB_HOME@/CLAUDE-TEMPLATE.md` are Claude-era compatibility inputs unless the user explicitly asks to maintain Claude instructions. This file is the generic source spec installed into Codex by `install.sh`.
 
 Prefer `AGENTS.md` as the Codex-native target. Only edit `CLAUDE.md` when the user explicitly wants Claude compatibility. If both files exist, keep `AGENTS.md` as the active Codex source and treat `CLAUDE.md` as legacy context.
 
@@ -28,7 +30,7 @@ Prefer `AGENTS.md` as the Codex-native target. Only edit `CLAUDE.md` when the us
    Run /sync-docs first to build the cross-project knowledge base, then retry.
    ```
 
-2. Check that `@KB_HOME@/CLAUDE-TEMPLATE.md` exists. If not, abort with the same message.
+2. Check that `@KB_HOME@/CLAUDE-TEMPLATE.md` exists. If not, continue with the compact Codex pointer block below instead of aborting; the template is useful migration context, not required runtime state.
 
 3. Check that `/Users/cm/Downloads/sync-docs/scripts/kb-search.py` exists (it's referenced in the protocol). If missing, warn but proceed.
 
@@ -38,7 +40,8 @@ Find an `AGENTS.md` at the cwd or one parent up. If none exists, use a cwd or pa
 
 If no target exists:
 - Ask the user: "no AGENTS.md found in this project. Create a minimal one from the KB template?"
-- If yes: scaffold from `@KB_HOME@/CLAUDE-TEMPLATE.md`, replacing `{项目名}` with the cwd basename and adapting wording from Claude to Codex/AGENTS.md. Save and continue.
+- If yes and `@KB_HOME@/CLAUDE-TEMPLATE.md` exists: scaffold from it, replacing `{项目名}` with the cwd basename and adapting wording from Claude to Codex/AGENTS.md. Save and continue.
+- If yes and the template is missing: create a minimal `AGENTS.md` containing the compact Codex pointer block below. Save and continue.
 - If no: abort.
 
 Record the absolute path of this file as `<TARGET>`.
@@ -46,7 +49,7 @@ Record the absolute path of this file as `<TARGET>`.
 ## Step 3: Read inputs
 
 - `<TARGET>` (the project's `AGENTS.md`, or `CLAUDE.md` only for explicit compatibility)
-- `@KB_HOME@/CLAUDE-TEMPLATE.md` (canonical "good integration")
+- `@KB_HOME@/CLAUDE-TEMPLATE.md` (legacy compatibility reference, when present)
 - `@KB_HOME@/registry.md` — to compute "K KB entries match this project's stack" relevance hint (see Step 6)
 - `@KB_HOME@/hashes.json` — to validate any KB paths the target already references
 

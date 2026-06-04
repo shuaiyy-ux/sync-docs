@@ -11,7 +11,9 @@ description: |
 
 You are maintaining a cross-project Markdown knowledge base. **Most of the work is done by deterministic Python scripts.** Your only job is to (a) run those scripts, (b) make LLM judgment calls on the small set of items that need them, and (c) report results.
 
-Codex port note: this workflow was originally a Claude slash command. In Codex, do LLM judgment work in the current session when practical. Use a bounded `codex exec` worker only when a separate batch worker is genuinely needed.
+Runtime note: this source spec installs as a Codex skill, but the workflow still understands Claude-era project instruction files and KB paths for migration compatibility. Treat Codex as the primary runtime, Claude files as compatibility input, and this Markdown file as the generic skill source.
+
+This workflow was originally a Claude slash command. In Codex, do LLM judgment work in the current session when practical. Use a bounded `codex exec` worker only when a separate batch worker is genuinely needed.
 
 The scripts live at `@SKILL_HOME@/scripts/`. The KB lives at `@KB_HOME@/`.
 
@@ -238,7 +240,7 @@ unchanged: U | updated: V | moved: W | new: X | deleted: Y
 
 ## Project instruction punch list (optional, per-project review)
 
-For every project with a top-level `AGENTS.md` or legacy `CLAUDE.md`, audit KB integration in a separate pass (read the file, grep for `claude-knowledge` and `kb-search`). Print suggestions only — never auto-edit project files.
+For every project with a top-level `AGENTS.md` or legacy `CLAUDE.md`, audit KB integration in a separate pass (read the file, grep for `claude-knowledge` and `kb-search`). Prefer Codex-native `AGENTS.md` in suggestions; mention `CLAUDE.md` only as compatibility context. Print suggestions only — never auto-edit project files.
 
 ---
 
@@ -293,7 +295,7 @@ If any assertion fires, do not declare sync complete — investigate.
 ## Notes for future maintainers
 
 - The 1300-line v1 of this spec was 100% LLM-orchestrated, which made each run take ~22 minutes regardless of actual changes. Most of that was LLM "looking at" the 500 unchanged files via repeated tool calls. The script-driven v2 (prepare + finalize) cuts incremental runs to ~2 minutes by never enumerating unchanged files in agent context.
-- All paths use `@SKILL_HOME@` / `@KB_HOME@` placeholders. Keep the installed Codex skill at `~/.codex/skills/sync-docs/SKILL.md` aligned with this source spec when the workflow changes.
+- All paths use `@SKILL_HOME@` / `@KB_HOME@` placeholders. Keep the installed Codex skill at `~/.codex/skills/sync-docs/SKILL.md` aligned with this generic source spec when the workflow changes.
 - Canonical selection in `_pick_canonical` is a single scoring function (no ordered rules). Archive/worktree paths get -100, docs/specs get +10, recent mtime gets up to +5. Highest score wins, lex tiebreak. To change canonical preference, edit `_score_canonicality` in `scripts/prepare.py` — penalties dominate by design.
 - context.md has no length cap — was a 2024 concern when context was scarce; today 1000 lines ≈ 4KB ≈ 2k tokens, trivial. If profiles+PK grow huge, the right answer is to prune dead projects, not compress.
 - "Other %" is no longer a health metric. Some docs genuinely don't fit any bucket; that's fine.
