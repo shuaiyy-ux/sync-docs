@@ -11,9 +11,9 @@ description: |
 
 You are maintaining a cross-project Markdown knowledge base. **Most of the work is done by deterministic Python scripts.** Your only job is to (a) run those scripts, (b) make LLM judgment calls on the small set of items that need them, and (c) report results.
 
-Runtime note: this source spec installs as a Codex skill, but the workflow still understands Claude-era project instruction files and KB paths for migration compatibility. Treat Codex as the primary runtime, Claude files as compatibility input, and this Markdown file as the generic skill source.
+Runtime note: this source spec installs as a Claude skill (under `~/.claude/skills/`). The workflow can also read legacy Codex `AGENTS.md` files for compatibility when present. Treat Claude Code as the primary runtime, `AGENTS.md` as optional legacy input, and this Markdown file as the generic skill source.
 
-This workflow was originally a Claude slash command. In Codex, do LLM judgment work in the current session when practical. Use a bounded `codex exec` worker only when a separate batch worker is genuinely needed.
+This workflow runs as a Claude skill. Do LLM judgment work in the current session when practical. Spawn a bounded Claude subagent (Task) worker only when a separate batch worker is genuinely needed.
 
 The scripts live at `@SKILL_HOME@/scripts/`. The KB lives at `@KB_HOME@/`.
 
@@ -36,7 +36,7 @@ The scripts live at `@SKILL_HOME@/scripts/`. The KB lives at `@KB_HOME@/`.
 │   1. Read work-order.json — small (~10KB)                     │
 │   2. For each entry in needs_takeaway_extraction:             │
 │        - chunk-eligible? section it (rule below)              │
-│        - extract takeaways in Codex current session           │
+│        - extract takeaways in the current session             │
 │   3. Cluster re-validation (only if cluster members changed)  │
 │   4. Conflict detection on candidate pairs                    │
 │   5. Write agent-outputs.json                                 │
@@ -130,7 +130,7 @@ For chunk-eligible files: split on H2 (or H3 if ≤2 H2s). Each section becomes 
 
 ### B.3 Takeaway extraction
 
-Process changed entries in the current Codex session whenever the batch is small enough to inspect safely. Cap each reasoning batch at 30 entries; for larger sets, split the work and keep `agent-outputs.json` as the merge point.
+Process changed entries in the current session whenever the batch is small enough to inspect safely. Cap each reasoning batch at 30 entries; for larger sets, split the work and keep `agent-outputs.json` as the merge point.
 
 For each entry, produce a 150-400 character takeaway that:
 1. States the MECHANISM / decision / lesson, not the topic.
@@ -148,7 +148,7 @@ Write results in this shape:
 ]
 ```
 
-If the changed set is too large for the current session, run a bounded `codex exec` worker against a temporary JSON input file and require JSON-only output. If no LLM path is practical, prefix the takeaway with `[mechanical: first-paragraph fallback]`, use the first non-empty paragraph after the heading, and add `{"pending_llm_extraction": [eid, ...]}` to `agent-outputs.json`.
+If the changed set is too large for the current session, run a bounded `a Claude subagent (Task)` worker against a temporary JSON input file and require JSON-only output. If no LLM path is practical, prefix the takeaway with `[mechanical: first-paragraph fallback]`, use the first non-empty paragraph after the heading, and add `{"pending_llm_extraction": [eid, ...]}` to `agent-outputs.json`.
 
 ### B.4 Refresh embeddings (one-shot, so B.5/B.6 can do similarity math)
 
@@ -240,7 +240,7 @@ unchanged: U | updated: V | moved: W | new: X | deleted: Y
 
 ## Project instruction punch list (optional, per-project review)
 
-For every project with a top-level `AGENTS.md` or legacy `CLAUDE.md`, audit KB integration in a separate pass (read the file, grep for `claude-knowledge` and `kb-search`). Prefer Codex-native `AGENTS.md` in suggestions; mention `CLAUDE.md` only as compatibility context. Print suggestions only — never auto-edit project files.
+For every project with a top-level `AGENTS.md` or legacy `CLAUDE.md`, audit KB integration in a separate pass (read the file, grep for `claude-knowledge` and `kb-search`). Prefer Claude-native `CLAUDE.md` in suggestions; mention `AGENTS.md` only as compatibility context. Print suggestions only — never auto-edit project files.
 
 ---
 
@@ -295,7 +295,7 @@ If any assertion fires, do not declare sync complete — investigate.
 ## Notes for future maintainers
 
 - The 1300-line v1 of this spec was 100% LLM-orchestrated, which made each run take ~22 minutes regardless of actual changes. Most of that was LLM "looking at" the 500 unchanged files via repeated tool calls. The script-driven v2 (prepare + finalize) cuts incremental runs to ~2 minutes by never enumerating unchanged files in agent context.
-- All paths use `@SKILL_HOME@` / `@KB_HOME@` placeholders. Keep the installed Codex skill at `~/.codex/skills/sync-docs/SKILL.md` aligned with this generic source spec when the workflow changes.
+- All paths use `@SKILL_HOME@` / `@KB_HOME@` placeholders. Keep the installed Claude skill at `~/.claude/skills/sync-docs/SKILL.md` aligned with this generic source spec when the workflow changes.
 - Canonical selection in `_pick_canonical` is a single scoring function (no ordered rules). Archive/worktree paths get -100, docs/specs get +10, recent mtime gets up to +5. Highest score wins, lex tiebreak. To change canonical preference, edit `_score_canonicality` in `scripts/prepare.py` — penalties dominate by design.
 - context.md has no length cap — was a 2024 concern when context was scarce; today 1000 lines ≈ 4KB ≈ 2k tokens, trivial. If profiles+PK grow huge, the right answer is to prune dead projects, not compress.
 - "Other %" is no longer a health metric. Some docs genuinely don't fit any bucket; that's fine.

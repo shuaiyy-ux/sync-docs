@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# sync-docs installer — wires this repo into Codex as the sync-docs,
+# sync-docs installer — wires this repo into Claude Code as the sync-docs,
 # kb-integrate, and kb-search skills, substituting absolute paths.
 #
 # Re-run after `git pull` to refresh installed skill files.
@@ -7,7 +7,10 @@
 set -euo pipefail
 
 SKILL_HOME="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-CODEX_SKILLS="${HOME}/.codex/skills"
+# Install target: claude (default, Claude-native) or codex (legacy).
+# Override: SKILL_TARGET=codex ./install.sh
+SKILL_TARGET="${SKILL_TARGET:-claude}"
+SKILLS_DIR="${HOME}/.${SKILL_TARGET}/skills"
 
 # --- KB_HOME selection -------------------------------------------------------
 # Default: ~/.claude-knowledge (hidden, conventional)
@@ -33,7 +36,7 @@ if [ ${#missing[@]} -ne 0 ]; then
     exit 1
 fi
 
-mkdir -p "${CODEX_SKILLS}" "${KB_HOME}"
+mkdir -p "${SKILLS_DIR}" "${KB_HOME}"
 
 # --- Bootstrap embedding venv (so first /sync-docs run doesn't fail) ----------
 VENV="${KB_HOME}/.venv"
@@ -49,7 +52,7 @@ fi
 install_skill() {
     local src="$1"
     local name="$2"
-    local dest_dir="${CODEX_SKILLS}/${name}"
+    local dest_dir="${SKILLS_DIR}/${name}"
     local dest="${dest_dir}/SKILL.md"
     if [ ! -f "${src}" ]; then
         echo "[install] Source missing: ${src}" >&2
@@ -67,7 +70,7 @@ install_skill() {
 # Remove pre-existing symlinks/files at the target so users coming from the
 # symlink era end up with the substituted version, not a dangling link.
 for skill in sync-docs kb-integrate kb-search; do
-    target="${CODEX_SKILLS}/${skill}/SKILL.md"
+    target="${SKILLS_DIR}/${skill}/SKILL.md"
     [ -e "${target}" ] || [ -L "${target}" ] && rm -f "${target}"
     install_skill "${SKILL_HOME}/${skill}.md" "${skill}"
 done
@@ -79,8 +82,10 @@ cat <<EOF
 [install] Done.
   SKILL_HOME = ${SKILL_HOME}
   KB_HOME    = ${KB_HOME}
-  Skills installed at ${CODEX_SKILLS}
+  Skills installed at ${SKILLS_DIR}
 
-Try the sync-docs skill in Codex. To change KB_HOME later:
-  KB_HOME=/new/path ./install.sh
+Try the sync-docs skill in Claude Code. If ~/.claude/skills/ was just created,
+restart Claude Code once so the new skills directory is watched.
+To change KB_HOME later:  KB_HOME=/new/path ./install.sh
+To install to Codex instead:  SKILL_TARGET=codex ./install.sh
 EOF

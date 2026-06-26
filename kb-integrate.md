@@ -1,9 +1,9 @@
 ---
 name: kb-integrate
 description: |
-  Wire the current project's AGENTS.md into the cross-project knowledge base.
-  Uses Codex-native instructions as the primary target, reads legacy Claude template
-  material when needed for migration compatibility, proposes a diff, and applies it
+  Wire the current project's CLAUDE.md into the cross-project knowledge base.
+  Uses Claude-native instructions as the primary target, reads any legacy AGENTS.md
+  material when present for compatibility, proposes a diff, and applies it
   after user approval. Never edits silently.
 
   Invoke when: starting a new project that should have KB access; or when an
@@ -18,9 +18,9 @@ description: |
 
 You are integrating the cross-project knowledge base into the current project's assistant instructions. You are running INSIDE that project's directory.
 
-Codex is the primary runtime. `AGENTS.md` is the preferred target. `CLAUDE.md` and `@KB_HOME@/CLAUDE-TEMPLATE.md` are Claude-era compatibility inputs unless the user explicitly asks to maintain Claude instructions. This file is the generic source spec installed into Codex by `install.sh`.
+Claude Code is the primary runtime. `CLAUDE.md` is the preferred target, and `@KB_HOME@/CLAUDE-TEMPLATE.md` is the scaffolding source. A legacy `AGENTS.md` is treated as compatibility input only when a project still requires Codex. This file is the generic source spec installed into `~/.claude/skills/` by `install.sh`.
 
-Prefer `AGENTS.md` as the Codex-native target. Only edit `CLAUDE.md` when the user explicitly wants Claude compatibility. If both files exist, keep `AGENTS.md` as the active Codex source and treat `CLAUDE.md` as legacy context.
+Prefer `CLAUDE.md` as the Claude-native target. Only edit `AGENTS.md` when the project explicitly still requires Codex compatibility. If both files exist, keep `CLAUDE.md` as the active source and treat `AGENTS.md` as legacy context.
 
 ## Step 1: Verify prerequisites
 
@@ -30,18 +30,18 @@ Prefer `AGENTS.md` as the Codex-native target. Only edit `CLAUDE.md` when the us
    Run /sync-docs first to build the cross-project knowledge base, then retry.
    ```
 
-2. Check that `@KB_HOME@/CLAUDE-TEMPLATE.md` exists. If not, continue with the compact Codex pointer block below instead of aborting; the template is useful migration context, not required runtime state.
+2. Check that `@KB_HOME@/CLAUDE-TEMPLATE.md` exists. If not, continue with the compact Claude pointer block below instead of aborting; the template is useful migration context, not required runtime state.
 
 3. Check that `/Users/cm/Downloads/sync-docs/scripts/kb-search.py` exists (it's referenced in the protocol). If missing, warn but proceed.
 
 ## Step 2: Locate target instruction file
 
-Find an `AGENTS.md` at the cwd or one parent up. If none exists, use a cwd or parent `CLAUDE.md` only when the user explicitly requested Claude compatibility.
+Find a `CLAUDE.md` at the cwd or one parent up. If none exists, use a cwd or parent `AGENTS.md` only when the project explicitly still requires Codex compatibility.
 
 If no target exists:
-- Ask the user: "no AGENTS.md found in this project. Create a minimal one from the KB template?"
-- If yes and `@KB_HOME@/CLAUDE-TEMPLATE.md` exists: scaffold from it, replacing `{项目名}` with the cwd basename and adapting wording from Claude to Codex/AGENTS.md. Save and continue.
-- If yes and the template is missing: create a minimal `AGENTS.md` containing the compact Codex pointer block below. Save and continue.
+- Ask the user: "no CLAUDE.md found in this project. Create a minimal one from the KB template?"
+- If yes and `@KB_HOME@/CLAUDE-TEMPLATE.md` exists: scaffold from it, replacing `{项目名}` with the cwd basename. Save and continue.
+- If yes and the template is missing: create a minimal `CLAUDE.md` containing the compact Claude pointer block below. Save and continue.
 - If no: abort.
 
 Record the absolute path of this file as `<TARGET>`.
@@ -59,7 +59,7 @@ Walk the target instruction file and identify findings, in priority order:
 
 | Severity | Finding | Detection |
 |---|---|---|
-| ⚠ optional | No `@@KB_HOME@/context.md` import and no compact Codex KB pointer section | grep substring |
+| ⚠ optional | No `@@KB_HOME@/context.md` import and no compact Claude KB pointer section | grep substring |
 | ✗ critical | No "## KB 使用协议" or compact "本地 kb" section at all | grep heading |
 | ⚠ stale | Has KB protocol but doesn't mention `kb-search.py` | grep substring "kb-search" |
 | ⚠ stale | Has KB protocol that says all "local KB" use must be semantic search and forbids grep without an exact-identifier exception | substring match: "必走" + "semantic" + "不 grep", or equivalent |
@@ -69,20 +69,20 @@ Walk the target instruction file and identify findings, in priority order:
 | ℹ info | Existing protocol section text differs from current template's "KB 使用协议" section by >30% (heuristic: token count diff) | text compare |
 
 For each finding, prepare a concrete patch:
-- **No @-import**: only propose `@@KB_HOME@/context.md` when the target has no compact Codex KB pointer section yet, or when the user explicitly wants always-loaded KB context. If the target already says KB rules are maintained in `~/.codex/skills/kb-search` / `~/.codex/skills/kb-integrate` and includes the exact identifier grep-first split, do not force an @-import.
-- **No protocol section**: append the compact Codex pointer block below, not the full template protocol.
-- **Stale protocol**: replace the existing "## KB 使用协议..." / "## 本地 kb..." section (start: heading, end: next `^## ` or EOF) with the compact Codex pointer block below, including the exact identifier / file name grep-first exception.
+- **No @-import**: only propose `@@KB_HOME@/context.md` when the target has no compact Claude KB pointer section yet, or when the user explicitly wants always-loaded KB context. If the target already says KB rules are maintained in `~/.claude/skills/kb-search` / `~/.claude/skills/kb-integrate` and includes the exact identifier grep-first split, do not force an @-import.
+- **No protocol section**: append the compact Claude pointer block below, not the full template protocol.
+- **Stale protocol**: replace the existing "## KB 使用协议..." / "## 本地 kb..." section (start: heading, end: next `^## ` or EOF) with the compact Claude pointer block below, including the exact identifier / file name grep-first exception.
 - **Stale paths / moved**: in-line replace the bad path with the new canonical (from `hashes.json` `previous_paths` chain) or the closest live anchor.
 
-Compact Codex pointer block:
+Compact Claude pointer block:
 
 ```markdown
 ## KB 使用协议（跨项目知识库）
 
 KB 规则不在本项目复制维护。权威来源:
 
-- `~/.codex/skills/kb-search/SKILL.md`
-- `~/.codex/skills/kb-integrate/SKILL.md`
+- `~/.claude/skills/kb-search/SKILL.md`
+- `~/.claude/skills/kb-integrate/SKILL.md`
 - 源文件: `~/Downloads/sync-docs/kb-search.md` / `~/Downloads/sync-docs/kb-integrate.md`
 
 分流原则: 描述性经验 / 模糊症状走 `kb-search.py`; 精确 identifier / 文件名 / 路径片段 / 错误原文先查 `~/Downloads/claude-knowledge/registry.md` 和 `context.md`.
@@ -126,7 +126,7 @@ Print a structured summary:
    <unified diff, condensed>
 
 3. Append after line C:
-   <compact Codex pointer block>
+   <compact Claude pointer block>
 
 ### Apply?
 - [a] apply all
@@ -134,13 +134,13 @@ Print a structured summary:
 - [n] cancel
 ```
 
-If user chooses `a`: apply via `apply_patch`, one scoped patch per change.
+If user chooses `a`: apply via `the Edit tool`, one scoped patch per change.
 If user chooses `s`: walk through changes one by one, take y/n for each.
 If user chooses `n`: exit without changes.
 
 ## Step 7: Apply
 
-Use `apply_patch` for manual edits. Never rewrite the whole file — preserve everything else (Architecture / Hard Rules / Git 规范 etc. are user-curated).
+Use `the Edit tool` for manual edits. Never rewrite the whole file — preserve everything else (Architecture / Hard Rules / Git 规范 etc. are user-curated).
 
 For multi-line replacements, ensure the `old_string` matches the file exactly (re-read if needed). For multiline appends, use a unique anchor (e.g., the last line of the file or a known section header).
 
@@ -148,7 +148,7 @@ For multi-line replacements, ensure the `old_string` matches the file exactly (r
 
 After applying:
 - Read `<TARGET>` again and confirm:
-  - `@@KB_HOME@/context.md` substring present only if it was applied, or a compact Codex KB pointer section is present
+  - `@@KB_HOME@/context.md` substring present only if it was applied, or a compact Claude KB pointer section is present
   - "## KB 使用协议（跨项目知识库）" or compact "本地 kb" heading present
   - "kb-search" substring present
   - No more dead KB paths
@@ -159,18 +159,18 @@ After applying:
 ## /kb-integrate Complete
 
 Applied N changes to <path>:
-- ✓ added optional @-import of context.md, or kept compact Codex pointer only
+- ✓ added optional @-import of context.md, or kept compact Claude pointer only
 - ✓ added KB usage protocol section
 - ✓ updated stale path X → Y (file moved)
 
 Stack relevance: K KB entries match this project's stack. After this change,
 new sessions in this project will:
-1. Point to the Codex KB skills instead of duplicating the full protocol in every project
+1. Point to the Claude KB skills instead of duplicating the full protocol in every project
 2. Optionally auto-load essentials from context.md only when this project explicitly chooses that import
 3. Know when exact identifiers / file names grep registry.md first vs when descriptive queries invoke kb-search.py
 4. Verify before applying (KB is hypothesis, code is truth)
 
-Try it: in a fresh Codex session in this project, ask:
+Try it: in a fresh Claude Code session in this project, ask:
   "search the KB for <some-known-topic-in-this-project's-domain>"
 It should produce a kb-search.py invocation and ground the answer in the result.
 ```
