@@ -7,6 +7,12 @@ description: |
   propagate to the central index; OR when context.md is over 7 days stale and a
   cross-project task is starting. DO NOT invoke for single-project doc edits — this
   rebuilds the full index every call and is not free.
+
+  This is the ONLY way new knowledge enters the searchable index. Write the material
+  into the owning project's own docs/ first, then run this to index it. Material with
+  no owning project goes in @KB_HOME@/policy/ instead (that dir is excluded from the
+  scan and is reached via @-import, not search). Never hand-write into @KB_HOME@ root
+  — it is regenerated output.
 ---
 
 You are maintaining a cross-project Markdown knowledge base. **Most of the work is done by deterministic Python scripts.** Your only job is to (a) run those scripts, (b) make LLM judgment calls on the small set of items that need them, and (c) report results.

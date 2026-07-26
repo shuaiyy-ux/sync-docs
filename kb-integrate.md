@@ -14,6 +14,12 @@ description: |
 
   This is the COMPLEMENT to /sync-docs. /sync-docs (re)builds the KB itself;
   /kb-integrate makes a single project consume the KB.
+
+  DOES NOT write knowledge INTO the KB — despite the name, this skill only wires a
+  project to CONSUME the KB. To add new knowledge: put it in the owning project's
+  own docs/ and run /sync-docs to index it; home-less methodology goes directly in
+  claude-knowledge/policy/ (that dir is excluded from the scan, reached via @-import).
+  Never hand-write into claude-knowledge/ root — it is generated output.
 ---
 
 You are integrating the cross-project knowledge base into the current project's assistant instructions. You are running INSIDE that project's directory.
@@ -86,6 +92,8 @@ KB 规则不在本项目复制维护。权威来源:
 - 源文件: `~/Downloads/sync-docs/kb-search.md` / `~/Downloads/sync-docs/kb-integrate.md`
 
 分流原则: 描述性经验 / 模糊症状走 `kb-search.py`; 精确 identifier / 文件名 / 路径片段 / 错误原文先查 `~/Downloads/claude-knowledge/registry.md` 和 `context.md`.
+
+写入原则: 有归属项目的经验写进该项目 `docs/`(跑 `/sync-docs` 才进索引); 无归属的通用方法论写 `~/Downloads/claude-knowledge/policy/`(不被扫描, 靠 `@`-import 触达)。别手写进 `~/Downloads/claude-knowledge/` 根目录 —— 那是生成物。
 ```
 
 ## Step 5: Stack-relevance hint
