@@ -99,7 +99,7 @@ This is how you answer "was the KB actually used in Claude-era sessions?" with d
 
 ## Companion skill: `/kb-integrate`
 
-`/sync-docs` builds the KB. `/kb-integrate` makes a project consume it. Invoke `/kb-integrate` inside any project — it audits that project's Codex `AGENTS.md`, uses `~/Downloads/claude-knowledge/CLAUDE-TEMPLATE.md` only as a legacy compatibility reference when present, proposes a diff (no silent edits), and applies after approval. It wires a compact pointer to the Codex KB skills and the lookup split: exact identifiers / file names use `registry.md` grep first, descriptive lessons / patterns use `kb-search.py`. `@`-import of `context.md` is optional and should only be added when a project explicitly wants always-loaded KB essentials. Legacy `CLAUDE.md` files are read as migration context, and edited only when the user explicitly asks for Claude compatibility.
+`/sync-docs` builds the KB. `/kb-integrate` makes a project consume it. Invoke `/kb-integrate` inside any project — it audits that project's Codex `AGENTS.md`, uses `~/Downloads/claude-knowledge/policy/claude-md-template.md` only as a legacy compatibility reference when present, proposes a diff (no silent edits), and applies after approval. It wires a compact pointer to the Codex KB skills and the lookup split: exact identifiers / file names use `registry.md` grep first, descriptive lessons / patterns use `kb-search.py`. `@`-import of `context.md` is optional and should only be added when a project explicitly wants always-loaded KB essentials. Legacy `CLAUDE.md` files are read as migration context, and edited only when the user explicitly asks for Claude compatibility.
 
 Natural-language entry points (skill auto-detects):
 - "check /sync-docs and update my CLAUDE.md accordingly"
@@ -139,7 +139,7 @@ Install or refresh the Codex skills from this repo:
 ## Codex, Claude, and Generic Skill Roles
 
 - **Codex**: primary runtime. Install source specs into `~/.codex/skills`, target project instructions at `AGENTS.md`, and use `kb-search.py` through the Codex skill workflow.
-- **Claude**: compatibility layer. Existing `CLAUDE.md`, `~/.claude/projects/*` logs, and `CLAUDE-TEMPLATE.md` remain useful migration sources, but they are not the active Codex authority unless the user explicitly requests Claude compatibility.
+- **Claude**: compatibility layer. Existing `CLAUDE.md`, `~/.claude/projects/*` logs, and `policy/claude-md-template.md` remain useful migration sources, but they are not the active Codex authority unless the user explicitly requests Claude compatibility.
 - **Generic skill specs**: this repo's `*.md` files are the source specs. They use placeholders such as `@SKILL_HOME@` and `@KB_HOME@` so another installer or assistant runtime can adapt them without changing the workflow text by hand.
 
 ## Why

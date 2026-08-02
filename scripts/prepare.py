@@ -45,6 +45,8 @@ FIND_EXCLUDE_PATHS = [
     "*/dist/*", "*/build/*", "*/.cache/*", "*/__pycache__/*",
     "*/.expo/*", "*/.next/*", "*/.pytest_cache/*",
     "*/.specify/*", "*/.cursor/*", "*/.github/*",
+    "*/worktrees/*", "*/.claude/worktrees/*",
+    "*/.claude/*", "*/.agents/*", "*/.flows/*",
     "*/claude-knowledge/_generated/*", "*/claude-knowledge/*",
     "*/test_fixture/*", "*/test_fixtures/*",
     "*/curseforge/*", "*/jre.bundle/*", "*/Jre_*/*",
@@ -216,12 +218,17 @@ def build_survivors(previous: dict, changes: dict, new_files: dict) -> dict:
         }
         survivor_file_paths.add(path)
 
-    # Sections: carry forward iff parent_file survives, OR rebuild parent_file pointer if parent moved
+    # Sections: carry forward iff parent_file survives, OR rebuild parent_file pointer if parent moved.
+    # Sections of UPDATED parents are dropped — the agent re-derives them in Phase B; carrying the old
+    # set forward alongside the re-derived one is how stale duplicate sections accumulated.
     moved_old_to_new = {old: new for (old, new) in changes["moved"].values()}
+    updated_paths = set(changes["updated"].values())
     for eid, e in previous.items():
         if e.get("entry_type") != "section":
             continue
         parent = e.get("parent_file")
+        if parent in updated_paths:
+            continue
         if parent in moved_old_to_new:
             new_parent = moved_old_to_new[parent]
             survivors[eid] = {

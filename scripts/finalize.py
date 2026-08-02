@@ -214,9 +214,10 @@ def categorize(entry: dict, scan_roots: list[str], overrides: dict) -> str:
     base = os.path.basename(parent)
     base_lower = base.lower()
 
-    # Project Profiles (file-level only, parent at root)
+    # Project Profiles (file-level only, parent at root, not inside a dot-directory —
+    # .flows/README.md etc. are tooling boilerplate, not a project's profile)
     if entry.get("entry_type") == "file" and base in ("CLAUDE.md", "README.md"):
-        if _is_project_root_file(path, scan_roots):
+        if _is_project_root_file(path, scan_roots) and "/." not in path:
             return "Project Profiles"
 
     # Primary path/filename rules
@@ -285,14 +286,22 @@ def _build_section_blocks(entries_by_cat: dict, scan_roots: list[str],
         items = entries_by_cat.get(cat, [])
         if not items:
             continue
-        # Skip project-specific lessons; skip non-canonical cluster members; skip section parents
+        # Skip project-specific lessons; skip non-canonical cluster members; skip section parents.
+        # Quality gates (context.md only — registry.md keeps everything greppable):
+        #   [mechanical…] = first-paragraph fallback that never got LLM extraction;
+        #   fragments = takeaways too short to stand alone or cut mid-sentence at a colon.
         filtered = []
         for e in items:
             if e.get("kind") == "project-specific":
                 continue
             if e.get("cluster_member_of"):
                 continue
-            if e.get("entry_type") == "file" and (e.get("takeaway") or "").startswith("列表型聚合文档"):
+            take = (e.get("synthesized_takeaway") or e.get("takeaway") or "").strip()
+            if e.get("entry_type") == "file" and take.startswith("列表型聚合文档"):
+                continue
+            if take.startswith("[mechanical"):
+                continue
+            if len(take) < 50 or take.endswith((":", "：")):
                 continue
             filtered.append(e)
 
@@ -308,6 +317,20 @@ def _build_section_blocks(entries_by_cat: dict, scan_roots: list[str],
                     live.append(e)
             live.sort(key=lambda e: e.get("mtime", 0), reverse=True)
             ordered = live + dead
+            # Cap profiles per project: root README/CLAUDE first (shallower path wins),
+            # at most 3 entries — stops category-README farms (11 subdir READMEs) from
+            # flooding the section.
+            by_proj: dict[str, list] = defaultdict(list)
+            for e in ordered:
+                by_proj[project_of(e["path"], scan_roots)].append(e)
+            keep = set()
+            for proj, es in by_proj.items():
+                es_sorted = sorted(es, key=lambda e: (
+                    display_path_of(e["path"], scan_roots).count("/"),
+                    -(e.get("mtime") or 0),
+                ))
+                keep.update(id(e) for e in es_sorted[:3])
+            ordered = [e for e in ordered if id(e) in keep]
             out.append(f"## {cat}")
             out.append("")
             for e in ordered:
@@ -634,6 +657,33 @@ def main() -> int:
                 "mtime": survivors.get(seid, {}).get("mtime") or time.time(),
                 "size": len(sec.get("body_excerpt", "")),
             }
+
+    # Dedup sections that differ only by anchor slug convention (e.g. one slugger
+    # dropped CJK tokens: "#f-4-…-学到的-pattern" vs "#f-4-…-pattern"). Normalize to
+    # ASCII alphanumerics; on collision keep the entry with the longer takeaway.
+    def _norm_anchor(anchor: str | None) -> str:
+        return re.sub(r"[^0-9a-z]", "", (anchor or "").lower())
+
+    anchor_seen: dict[tuple, str] = {}
+    for eid in sorted(survivors.keys()):
+        e = survivors[eid]
+        if e.get("entry_type") != "section":
+            continue
+        norm = _norm_anchor(e.get("section_anchor"))
+        if len(norm) < 2:
+            continue  # pure-CJK anchors normalize to nothing — don't risk false merges
+        key = (e.get("parent_file"), norm)
+        other = anchor_seen.get(key)
+        if other is None:
+            anchor_seen[key] = eid
+            continue
+        cur_len = len(e.get("takeaway") or "")
+        oth_len = len(survivors[other].get("takeaway") or "")
+        if (cur_len, eid) > (oth_len, other):
+            del survivors[other]
+            anchor_seen[key] = eid
+        else:
+            del survivors[eid]
 
     # Merge cluster assignments
     clusters = agent.get("clusters", {})

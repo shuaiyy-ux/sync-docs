@@ -200,7 +200,7 @@ This script:
 - Categorizes every entry (deterministic rules from Step 6 of the v1 spec)
 - Classifies `kind` (evergreen / project-specific / unknown) for lesson categories
 - **Computes embeddings** for new takeaways (auto-bootstraps `@KB_HOME@/.venv` on first run)
-- Renders `context.md` (full form — no cap, no compression cascade)
+- Renders `context.md` (full form — no cap, no compression cascade). Quality gates keep registry-only noise out of the injected file: `[mechanical…]` first-paragraph fallbacks, fragment takeaways (<50 chars or ending with a colon), dot-directory profiles, >3 profile entries per project. Everything still lands in `registry.md` for grep.
 - Renders `registry.md`
 - Atomic-writes `hashes.json` with `cluster_index`, `conflicts`, all entry metadata
 
@@ -246,7 +246,7 @@ unchanged: U | updated: V | moved: W | new: X | deleted: Y
 
 ## Project instruction punch list (optional, per-project review)
 
-For every project with a top-level `AGENTS.md` or legacy `CLAUDE.md`, audit KB integration in a separate pass (read the file, grep for `claude-knowledge` and `kb-search`). Prefer Claude-native `CLAUDE.md` in suggestions; mention `AGENTS.md` only as compatibility context. Print suggestions only — never auto-edit project files.
+For every project with a top-level `CLAUDE.md` or legacy `AGENTS.md`, audit KB integration in a separate pass (read the file, grep for `claude-knowledge` and `kb-search`). Prefer Claude-native `CLAUDE.md` in suggestions; mention `AGENTS.md` only as compatibility context. Print suggestions only — never auto-edit project files.
 
 ---
 

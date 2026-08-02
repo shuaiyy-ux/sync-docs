@@ -24,7 +24,7 @@ description: |
 
 You are integrating the cross-project knowledge base into the current project's assistant instructions. You are running INSIDE that project's directory.
 
-Claude Code is the primary runtime. `CLAUDE.md` is the preferred target, and `@KB_HOME@/CLAUDE-TEMPLATE.md` is the scaffolding source. A legacy `AGENTS.md` is treated as compatibility input only when a project still requires Codex. This file is the generic source spec installed into `~/.claude/skills/` by `install.sh`.
+Claude Code is the primary runtime. `CLAUDE.md` is the preferred target, and `@KB_HOME@/policy/claude-md-template.md` is the scaffolding source. A legacy `AGENTS.md` is treated as compatibility input only when a project still requires Codex. This file is the generic source spec installed into `~/.claude/skills/` by `install.sh`.
 
 Prefer `CLAUDE.md` as the Claude-native target. Only edit `AGENTS.md` when the project explicitly still requires Codex compatibility. If both files exist, keep `CLAUDE.md` as the active source and treat `AGENTS.md` as legacy context.
 
@@ -36,7 +36,7 @@ Prefer `CLAUDE.md` as the Claude-native target. Only edit `AGENTS.md` when the p
    Run /sync-docs first to build the cross-project knowledge base, then retry.
    ```
 
-2. Check that `@KB_HOME@/CLAUDE-TEMPLATE.md` exists. If not, continue with the compact Claude pointer block below instead of aborting; the template is useful migration context, not required runtime state.
+2. Check that `@KB_HOME@/policy/claude-md-template.md` exists. If not, continue with the compact Claude pointer block below instead of aborting; the template is useful migration context, not required runtime state.
 
 3. Check that `/Users/cm/Downloads/sync-docs/scripts/kb-search.py` exists (it's referenced in the protocol). If missing, warn but proceed.
 
@@ -46,7 +46,7 @@ Find a `CLAUDE.md` at the cwd or one parent up. If none exists, use a cwd or par
 
 If no target exists:
 - Ask the user: "no CLAUDE.md found in this project. Create a minimal one from the KB template?"
-- If yes and `@KB_HOME@/CLAUDE-TEMPLATE.md` exists: scaffold from it, replacing `{项目名}` with the cwd basename. Save and continue.
+- If yes and `@KB_HOME@/policy/claude-md-template.md` exists: scaffold from it per the template's own usage notes — fill each section from this project's actual facts, delete sections that don't apply plus the per-section usage comments, replace `{项目名}` with the cwd basename; never paste the template wholesale. Save and continue.
 - If yes and the template is missing: create a minimal `CLAUDE.md` containing the compact Claude pointer block below. Save and continue.
 - If no: abort.
 
@@ -54,8 +54,8 @@ Record the absolute path of this file as `<TARGET>`.
 
 ## Step 3: Read inputs
 
-- `<TARGET>` (the project's `AGENTS.md`, or `CLAUDE.md` only for explicit compatibility)
-- `@KB_HOME@/CLAUDE-TEMPLATE.md` (legacy compatibility reference, when present)
+- `<TARGET>` (the project's `CLAUDE.md`, or `AGENTS.md` only for explicit Codex compatibility)
+- `@KB_HOME@/policy/claude-md-template.md` (current canonical template, when present)
 - `@KB_HOME@/registry.md` — to compute "K KB entries match this project's stack" relevance hint (see Step 6)
 - `@KB_HOME@/hashes.json` — to validate any KB paths the target already references
 
@@ -194,7 +194,7 @@ If no changes were needed (project already integrated and current):
 ## Edge cases
 
 - **Multiple AGENTS.md candidates** (e.g., one at cwd and one at parent): ask user which to target.
-- **Legacy CLAUDE.md only**: do not edit it unless the user explicitly requests Claude compatibility; otherwise offer to create `AGENTS.md`.
+- **AGENTS.md only (Codex-era project)**: `CLAUDE.md` is the preferred target — offer to create it from the template; keep `AGENTS.md` as legacy context unless the project still requires Codex.
 - **Project's instruction file uses a custom KB protocol the user wrote intentionally**: detect via "do not auto-update" / "custom protocol" comment markers. If present, skip protocol replacement and only fix dead paths.
 - **Template itself is the target** (someone runs /kb-integrate while inside @KB_HOME@/): refuse with "this IS the template; nothing to wire".
 - **Target file is in git but has uncommitted changes**: warn user before editing — they may lose work otherwise.
