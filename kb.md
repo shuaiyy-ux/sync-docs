@@ -23,7 +23,7 @@ description: |
 
 # kb · 跨项目知识库
 
-KB 位置 `@KB_HOME@/`,脚本在 `@SKILL_HOME@/scripts/`。
+KB 位置 `@KB_HOME@/`，脚本在 `@SKILL_HOME@/scripts/`。
 
 ## 先选模式
 
@@ -37,7 +37,7 @@ KB 位置 `@KB_HOME@/`,脚本在 `@SKILL_HOME@/scripts/`。
 
 ## 三条贯穿规则
 
-**1 · 精确串用 grep,别用语义检索。**
+**1 · 精确串用 grep，别用语义检索。**
 知道字面量（文件名、符号名、错误原文）就直接：
 
 ```bash
@@ -52,7 +52,7 @@ grep "<literal>" @KB_HOME@/registry.md @KB_HOME@/context.md
 KB 与代码打架，代码赢——把过期情况告诉用户，别闷头照旧建议办。
 
 **3 · 经验往哪写。**
-有归属项目的写进该项目自己的 `docs/`,再跑**重建**模式才进索引。
+有归属项目的写进该项目自己的 `docs/`，再跑**重建**模式才进索引。
 无归属的通用方法论写 `claude-knowledge/policy/`（该目录不被扫描，靠 `@`-import 触达）。
 **别手写进 `claude-knowledge/` 根目录**——那是生成物，写进去检索不到，下次重建还会被覆盖。
 
