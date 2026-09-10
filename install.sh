@@ -67,13 +67,32 @@ install_skill() {
     echo "[install] Wrote ${dest}"
 }
 
-# Remove pre-existing symlinks/files at the target so users coming from the
-# symlink era end up with the substituted version, not a dangling link.
-for skill in sync-docs kb-integrate kb-search; do
-    target="${SKILLS_DIR}/${skill}/SKILL.md"
-    [ -e "${target}" ] || [ -L "${target}" ] && rm -f "${target}"
-    install_skill "${SKILL_HOME}/${skill}.md" "${skill}"
+# 2026-09-09: 三个 skill(sync-docs / kb-search / kb-integrate)合并成一个 `kb`。
+# 一个子系统开三扇门,每扇都得贴「此门非彼门」,模型会选错。现在只有一扇门,
+# 模式在读完 SKILL.md 之后选。三份正文原样保留,装进 kb/references/。
+LEGACY_SKILLS="sync-docs kb-integrate kb-search"
+for skill in ${LEGACY_SKILLS}; do
+    if [ -d "${SKILLS_DIR}/${skill}" ]; then
+        rm -rf "${SKILLS_DIR}/${skill}"
+        echo "[install] Removed legacy skill ${skill} (merged into kb)"
+    fi
 done
+
+install_skill "${SKILL_HOME}/kb.md" "kb"
+
+# 三份正文原样装进 references/,剥掉各自的 frontmatter
+mkdir -p "${SKILLS_DIR}/kb/references"
+install_reference() {
+    local src="$1" dst="$2"
+    [ -f "${src}" ] || { echo "[install] Source missing: ${src}" >&2; exit 1; }
+    sed -e "s|@SKILL_HOME@|${SKILL_HOME}|g" -e "s|@KB_HOME@|${KB_HOME}|g" "${src}" \
+      | awk 'fm<2 && /^---$/{fm++; next} fm>=2{print}' \
+      > "${SKILLS_DIR}/kb/references/${dst}.md"
+    echo "[install] Wrote ${SKILLS_DIR}/kb/references/${dst}.md"
+}
+install_reference "${SKILL_HOME}/kb-search.md"    "search"
+install_reference "${SKILL_HOME}/sync-docs.md"    "rebuild"
+install_reference "${SKILL_HOME}/kb-integrate.md" "wire-project"
 
 chmod +x "${SKILL_HOME}/scripts/"*.py 2>/dev/null || true
 
@@ -84,7 +103,7 @@ cat <<EOF
   KB_HOME    = ${KB_HOME}
   Skills installed at ${SKILLS_DIR}
 
-Try the sync-docs skill in Claude Code. If ~/.claude/skills/ was just created,
+Try the kb skill in Claude Code (/kb). If ~/.claude/skills/ was just created,
 restart Claude Code once so the new skills directory is watched.
 To change KB_HOME later:  KB_HOME=/new/path ./install.sh
 To install to Codex instead:  SKILL_TARGET=codex ./install.sh
